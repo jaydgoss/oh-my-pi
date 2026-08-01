@@ -58,7 +58,7 @@ git switch fix/openrouter-byok-zero-cost
 git rebase upstream/main
 ```
 
-Resolve conflicts if needed, then run the relevant checks:
+Resolve conflicts if needed, then install dependencies and run the relevant checks:
 
 ```sh
 bun install --frozen-lockfile
@@ -66,13 +66,26 @@ bun --cwd packages/ai check
 bun --cwd packages/ai test
 ```
 
-If native sources or the OMP version changed, rebuild the native addon when Rust/Bazel is available:
+## Self-contained native toolchain
+
+The checkout pins Rust in `rust-toolchain.toml` (`nightly-2026-07-28`) and Bazel in `.bazelversion` (`9.2.0`). Install the build tools once:
 
 ```sh
-bun run build:native
+brew install bazelisk
+rustup toolchain install nightly-2026-07-28 --component rustfmt clippy rust-analyzer
+export PATH="$HOME/.cargo/bin:/opt/homebrew/bin:$PATH"
 ```
 
-On this machine, the matching prebuilt platform addon is installed as `@oh-my-pi/pi-natives-darwin-arm64@17.2.2` and linked into `packages/natives/native/`. That local binary link is ignored through `.git/info/exclude`; it must not be committed.
+Build the native addon from this fork's source:
+
+```sh
+cd ~/omp-forked
+PATH="$HOME/.cargo/bin:/opt/homebrew/bin:$PATH" bun run build:native
+```
+
+The build uses Bazelisk and the repository's Bazel version pin, then installs the host addon into `packages/natives/native/`. The generated `.node` file is ignored by the repository's `.gitignore` and must not be committed.
+
+After this setup, the fork does not rely on any globally installed `@oh-my-pi/pi-coding-agent` or `@oh-my-pi/pi-natives` package. The CLI source and native addon both come from this checkout; ordinary third-party npm dependencies remain managed by the workspace lockfile.
 
 After a rebase, update the fork branch with the lease-protected force push required by rewritten history:
 
