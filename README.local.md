@@ -73,14 +73,14 @@ The checkout pins Rust in `rust-toolchain.toml` (`nightly-2026-07-28`) and Bazel
 ```sh
 brew install bazelisk
 rustup toolchain install nightly-2026-07-28 --component rustfmt clippy rust-analyzer
-export PATH="$HOME/.cargo/bin:/opt/homebrew/bin:$PATH"
+export PATH="$(brew --prefix rustup)/bin:/opt/homebrew/bin:$PATH"
 ```
 
 Build the native addon from this fork's source:
 
 ```sh
 cd ~/omp-forked
-PATH="$HOME/.cargo/bin:/opt/homebrew/bin:$PATH" bun run build:native
+PATH="$(brew --prefix rustup)/bin:/opt/homebrew/bin:$PATH" bun run build:native
 ```
 
 The build uses Bazelisk and the repository's Bazel version pin, then installs the host addon into `packages/natives/native/`. The generated `.node` file is ignored by the repository's `.gitignore` and must not be committed.
