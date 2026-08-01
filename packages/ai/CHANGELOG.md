@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed OpenRouter responses with a zero reported `usage.cost` being displayed as zero despite valid token usage; catalog-based estimates are now retained for that response shape.
+
 ## [17.2.2] - 2026-07-31
 
 ### Added

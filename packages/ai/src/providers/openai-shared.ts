@@ -383,7 +383,10 @@ export function applyOpenAIResponsesServiceTierCost(
 export function applyOpenRouterReportedCost(model: Pick<Model, "provider">, usage: Usage, rawUsage: unknown): void {
 	if (model.provider !== "openrouter" || typeof rawUsage !== "object" || rawUsage === null) return;
 	const reportedCost = Reflect.get(rawUsage, "cost");
-	if (typeof reportedCost !== "number" || !Number.isFinite(reportedCost) || reportedCost < 0) return;
+	// OpenRouter can report zero cost for BYOK or unmetered turns even when token
+	// usage is present. Preserve the catalog estimate instead of replacing it
+	// with a zero total.
+	if (typeof reportedCost !== "number" || !Number.isFinite(reportedCost) || reportedCost <= 0) return;
 
 	const estimatedCost = usage.cost.total;
 	if (Number.isFinite(estimatedCost) && estimatedCost > 0) {

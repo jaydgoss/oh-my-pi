@@ -50,10 +50,14 @@ function createSseResponse(
 		{ status: 200, headers: { "content-type": "text/event-stream" } },
 	);
 }
-function createChatDoneResponse(): Response {
+function createChatDoneResponse(usage?: Record<string, unknown>): Response {
+	const terminalChunk = {
+		choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
+		...(usage ? { usage } : {}),
+	};
 	return new Response(
 		`data: ${JSON.stringify({ choices: [{ index: 0, delta: { content: "ok" }, finish_reason: null }] })}\n\n` +
-			`data: ${JSON.stringify({ choices: [{ index: 0, delta: {}, finish_reason: "stop" }] })}\n\n` +
+			`data: ${JSON.stringify(terminalChunk)}\n\n` +
 			`data: [DONE]\n\n`,
 		{ status: 200, headers: { "content-type": "text/event-stream" } },
 	);
@@ -334,6 +338,60 @@ describe("OpenRouter Responses request shape", () => {
 			message.usage.cost.cacheRead +
 			message.usage.cost.cacheWrite;
 		expect(componentTotal).toBeCloseTo(providerCost);
+	});
+	it("retains catalog estimates when OpenRouter reports zero cost with token usage", async () => {
+		const chatUsage = {
+			prompt_tokens: 1_000_000,
+			completion_tokens: 100_000,
+			total_tokens: 1_100_000,
+			prompt_tokens_details: { cached_tokens: 0 },
+			cost: 0,
+			is_byok: true,
+		};
+		const responsesUsage = {
+			input_tokens: 1_000_000,
+			output_tokens: 100_000,
+			total_tokens: 1_100_000,
+			input_tokens_details: { cached_tokens: 0 },
+			cost: 0,
+			is_byok: true,
+		};
+
+		const modelCost = { input: 0.435, output: 0.87, cacheRead: 0.003625, cacheWrite: 0 };
+		const expectedCost = 0.522;
+		const chatFetchMock: FetchImpl = vi.fn(async () => createChatDoneResponse(chatUsage));
+		const chatStream = streamOpenAICompletions(
+			buildOpenRouterModel({ cost: modelCost }) as unknown as Model<"openai-completions">,
+			context,
+			{ apiKey: "test-key", fetch: chatFetchMock },
+		);
+		let chatMessage: AssistantMessage | undefined;
+		for await (const event of chatStream) {
+			if (event.type === "done") {
+				chatMessage = event.message;
+				break;
+			}
+			if (event.type === "error") throw event.error;
+		}
+		if (!chatMessage) throw new Error("Expected completed OpenRouter Chat Completions response");
+		expect(chatMessage.usage.cost.total).toBeCloseTo(expectedCost, 10);
+
+		const responsesFetchMock: FetchImpl = vi.fn(async () => createSseResponse(responsesUsage));
+		const responsesStream = streamOpenAIResponses(buildOpenRouterResponsesModel({ cost: modelCost }), context, {
+			apiKey: "test-key",
+			fetch: responsesFetchMock,
+		});
+		let responsesMessage: AssistantMessage | undefined;
+		for await (const event of responsesStream) {
+			if (event.type === "done") {
+				responsesMessage = event.message;
+				break;
+			}
+			if (event.type === "error") throw event.error;
+		}
+		if (!responsesMessage) throw new Error("Expected completed OpenRouter Responses response");
+
+		expect(responsesMessage.usage.cost.total).toBeCloseTo(expectedCost, 10);
 	});
 
 	it("appends openrouterVariant only when the resolved model id has no variant after the final slash", async () => {
