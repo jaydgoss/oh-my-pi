@@ -4,7 +4,7 @@
 
 ### Fixed
 
-- Fixed OpenRouter responses with a zero reported `usage.cost` being displayed as zero despite valid token usage; catalog-based estimates are now retained for that response shape.
+- Fixed OpenRouter BYOK responses with zero reported `usage.cost` being displayed as zero despite valid token usage; catalog-based estimates are now retained for responses marked `is_byok`.
 
 ## [17.2.2] - 2026-07-31
 

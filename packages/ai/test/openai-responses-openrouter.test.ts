@@ -339,7 +339,7 @@ describe("OpenRouter Responses request shape", () => {
 			message.usage.cost.cacheWrite;
 		expect(componentTotal).toBeCloseTo(providerCost);
 	});
-	it("retains catalog estimates when OpenRouter reports zero cost with token usage", async () => {
+	it("retains catalog estimates when OpenRouter reports zero cost for BYOK usage", async () => {
 		const chatUsage = {
 			prompt_tokens: 1_000_000,
 			completion_tokens: 100_000,
@@ -392,6 +392,36 @@ describe("OpenRouter Responses request shape", () => {
 		if (!responsesMessage) throw new Error("Expected completed OpenRouter Responses response");
 
 		expect(responsesMessage.usage.cost.total).toBeCloseTo(expectedCost, 10);
+	});
+	it("keeps non-BYOK zero reported cost authoritative", async () => {
+		const fetchMock: FetchImpl = vi.fn(async () =>
+			createSseResponse({
+				input_tokens: 1_000_000,
+				output_tokens: 100_000,
+				total_tokens: 1_100_000,
+				input_tokens_details: { cached_tokens: 0 },
+				cost: 0,
+				is_byok: false,
+			}),
+		);
+		const stream = streamOpenAIResponses(
+			buildOpenRouterResponsesModel({
+				cost: { input: 0.435, output: 0.87, cacheRead: 0.003625, cacheWrite: 0 },
+			}),
+			context,
+			{ apiKey: "test-key", fetch: fetchMock },
+		);
+		let message: AssistantMessage | undefined;
+		for await (const event of stream) {
+			if (event.type === "done") {
+				message = event.message;
+				break;
+			}
+			if (event.type === "error") throw event.error;
+		}
+		if (!message) throw new Error("Expected completed OpenRouter response");
+
+		expect(message.usage.cost.total).toBe(0);
 	});
 
 	it("appends openrouterVariant only when the resolved model id has no variant after the final slash", async () => {
