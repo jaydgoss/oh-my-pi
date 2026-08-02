@@ -58,12 +58,19 @@ git switch fix/openrouter-byok-zero-cost
 git rebase upstream/main
 ```
 
-Resolve conflicts if needed, then install dependencies and run the relevant checks:
+Resolve conflicts if needed, then install dependencies, rebuild native bindings, and run the relevant checks:
 
 ```sh
 bun install --frozen-lockfile
+PATH="$(brew --prefix rustup)/bin:/opt/homebrew/bin:$PATH" bun run build:native
 bun --cwd packages/ai check
 bun --cwd packages/ai test
+```
+
+Verify native addon exports match the current fork source:
+
+```sh
+bun -e 'import * as n from "@oh-my-pi/pi-natives"; console.log({ diffLines: typeof n.diffLines, diffWords: typeof n.diffWords, astGrep: typeof n.astGrep })'
 ```
 
 ## Self-contained native toolchain
@@ -84,6 +91,8 @@ PATH="$(brew --prefix rustup)/bin:/opt/homebrew/bin:$PATH" bun run build:native
 ```
 
 The build uses Bazelisk and the repository's Bazel version pin, then installs the host addon into `packages/natives/native/`. The generated `.node` file is ignored by the repository's `.gitignore` and must not be committed.
+
+For details on native addon version drift and troubleshooting missing exports (e.g. `diffWords is not a function`), see [README.local-native-addon.md](./README.local-native-addon.md).
 
 After this setup, the fork does not rely on any globally installed `@oh-my-pi/pi-coding-agent` or `@oh-my-pi/pi-natives` package. The CLI source and native addon both come from this checkout; ordinary third-party npm dependencies remain managed by the workspace lockfile.
 
